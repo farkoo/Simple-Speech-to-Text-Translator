@@ -23,7 +23,7 @@ pip install Flask hezar
 
 1.    Run the Flask application:
 
-```
+```python
 
 python main.py
 
@@ -37,7 +37,7 @@ python main.py
 ```
 
 4. Example Response:
-```
+```json
 {
     "transcripts": [
         {
