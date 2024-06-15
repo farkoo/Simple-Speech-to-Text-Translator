@@ -1,1 +1,1 @@
-# Simple Speech to Text Transformer
+# Simple Speech to Text Translator
