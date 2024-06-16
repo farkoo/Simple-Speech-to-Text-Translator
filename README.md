@@ -15,7 +15,7 @@ Installation
 
 ```
 
-pip install Flask hezar
+pip install Flask hezar librosa
 
 ```
 
