@@ -1,12 +1,18 @@
 from flask import Flask, request, jsonify
 from hezar.models import Model
 import os
+import uuid
+import time
+import io
+from flasgger import Swagger
+from pydub import AudioSegment
 
 app = Flask(__name__)
+swagger = Swagger(app)
 
 # Set the upload folder and allowed extensions
-UPLOAD_FOLDER = 'C:\\temp'
-ALLOWED_EXTENSIONS = {'wav', 'mp3', 'm4a', 'flac'}
+UPLOAD_FOLDER = '/root/farkoo/tmp'
+ALLOWED_EXTENSIONS = {'wav', 'mp3', 'm4a', 'flac', 'ogg'}
 
 # Ensure the upload folder exists
 if not os.path.exists(UPLOAD_FOLDER):
@@ -19,23 +25,78 @@ model = Model.load("hezarai/whisper-small-fa")
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
+def convert_ogg_to_mp3(ogg_file_path, mp3_file_path):
+    """
+    Converts an OGG file to MP3 format.
+
+    :param ogg_file_path: Path to the input OGG file.
+    :param mp3_file_path: Path to the output MP3 file.
+    """
+    try:
+        # Load the OGG file
+        audio = AudioSegment.from_file(ogg_file_path, format="ogg")
+        
+        # Export as MP3
+        audio.export(mp3_file_path, format="mp3")
+        return True
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        return False
+
 @app.route('/transcribe', methods=['POST'])
 def transcribe():
-    # Check if an audio file was sent with the request
+    """
+    Transcribe audio file to text
+    ---
+    consumes:
+      - multipart/form-data
+    parameters:
+      - in: formData
+        name: file
+        type: file
+        required: true
+        description: The audio file to upload
+    responses:
+      200:
+        description: The transcribed text
+        schema:
+          type: object
+          properties:
+            text:
+              type: string
+      400:
+        description: Invalid input
+    """
     if 'file' not in request.files:
         return jsonify({'error': 'No file provided'}), 400
 
     file = request.files['file']
 
-    # Check if the file has an allowed extension
     if file and allowed_file(file.filename):
-        filename = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
-        file.save(filename)
+        file_ext = file.filename.rsplit('.', 1)[1].lower()
+        unique_filename = f"{uuid.uuid4()}_{int(time.time())}.{file_ext}"
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
+        file.save(filepath)
 
-        transcripts = model.predict(filename)
+        if file_ext == 'ogg':
+            mp3_filename = f"{uuid.uuid4()}_{int(time.time())}.mp3"
+            mp3_filepath = os.path.join(app.config['UPLOAD_FOLDER'], mp3_filename)
+            if convert_ogg_to_mp3(filepath, mp3_filepath):
+                filepath = mp3_filepath
+            else:
+                os.remove(filepath)
+                return jsonify({'error': 'Failed to convert OGG to MP3'}), 500
 
-        # Return the transcripts as a JSON response
-        response = jsonify({'transcripts': transcripts})
+        transcripts = model.predict(filepath)
+
+        text = transcripts[0]['text'] if 'text' in transcripts[0] else ""
+
+        # Delete the processed files
+        os.remove(filepath)
+        if file_ext == 'ogg':
+            os.remove(mp3_filepath)
+
+        response = jsonify({'text': text})
         response.headers['Content-Type'] = 'application/json; charset=utf-8'
         return response
     else:
