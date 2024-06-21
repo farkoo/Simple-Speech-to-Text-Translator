@@ -3,7 +3,6 @@ from hezar.models import Model
 import os
 import uuid
 import time
-import io
 from flasgger import Swagger
 from pydub import AudioSegment
 
@@ -35,7 +34,7 @@ def convert_ogg_to_mp3(ogg_file_path, mp3_file_path):
     try:
         # Load the OGG file
         audio = AudioSegment.from_file(ogg_file_path, format="ogg")
-        
+
         # Export as MP3
         audio.export(mp3_file_path, format="mp3")
         return True
@@ -78,23 +77,28 @@ def transcribe():
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
         file.save(filepath)
 
-        if file_ext == 'ogg':
-            mp3_filename = f"{uuid.uuid4()}_{int(time.time())}.mp3"
-            mp3_filepath = os.path.join(app.config['UPLOAD_FOLDER'], mp3_filename)
-            if convert_ogg_to_mp3(filepath, mp3_filepath):
-                filepath = mp3_filepath
+        mp3_filepath = None
+        try:
+            if file_ext == 'ogg':
+                mp3_filename = f"{uuid.uuid4()}_{int(time.time())}.mp3"
+                mp3_filepath = os.path.join(app.config['UPLOAD_FOLDER'], mp3_filename)
+                if convert_ogg_to_mp3(filepath, mp3_filepath):
+                    final_filepath = mp3_filepath
+                else:
+                    os.remove(filepath)
+                    return jsonify({'error': 'Failed to convert OGG to MP3'}), 500
             else:
+                final_filepath = filepath
+
+            transcripts = model.predict(final_filepath)
+            text = transcripts[0]['text'] if 'text' in transcripts[0] else ""
+
+        finally:
+            # Delete the processed files
+            if os.path.exists(filepath):
                 os.remove(filepath)
-                return jsonify({'error': 'Failed to convert OGG to MP3'}), 500
-
-        transcripts = model.predict(filepath)
-
-        text = transcripts[0]['text'] if 'text' in transcripts[0] else ""
-
-        # Delete the processed files
-        os.remove(filepath)
-        if file_ext == 'ogg':
-            os.remove(mp3_filepath)
+            if mp3_filepath and os.path.exists(mp3_filepath):
+                os.remove(mp3_filepath)
 
         response = jsonify({'text': text})
         response.headers['Content-Type'] = 'application/json; charset=utf-8'
