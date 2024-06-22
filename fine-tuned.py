@@ -1,5 +1,3 @@
-
-
 import pandas as pd
 from sklearn.model_selection import train_test_split
 from hezar.models import Model
@@ -8,17 +6,6 @@ from hezar.preprocessors import Preprocessor
 from datasets import Dataset, load_metric
 from hezar.data import Dataset
 import torch
-
-# # Load the Excel file
-# file_path = r"C:\Users\ACER\Downloads\archive (9)\final_df.xlsx"
-# df = pd.read_excel(file_path)
-
-# # Split the dataset into training (60%) and testing (40%) sets
-# train_df, test_df = train_test_split(df, test_size=0.4, random_state=42)
-
-# # Convert the DataFrame to a Dataset
-# train_dataset = Dataset.from_pandas(train_df)
-# test_dataset = Dataset.from_pandas(test_df)
 
 dataset_path = "hezarai/common-voice-13-fa"
 base_model_path = "hezarai/whisper-small"
@@ -65,7 +52,4 @@ model.save_pretrained("./fine-tuned-whisper-small-fa")
 # Evaluate the model
 metrics = trainer.evaluate()
 print(metrics)
-#%%
-from hezar.data import Dataset
 
-commonvoice_dataset = Dataset.load("hezarai/common-voice-13-fa", preprocessor="hezarai/whisper-small-fa")  # A SpeechRecognitionDataset instance
